@@ -116,6 +116,7 @@ async def visit():
         failed_count = 0
         player_name = None
         player_uid = None
+        level = None
 
         async with aiohttp.ClientSession() as session:
             tasks = [
@@ -129,8 +130,10 @@ async def visit():
                 if player_name is None and player_uid is None:
                     jsone = MessageToJson(info)
                     data_info = json.loads(jsone)
+                    acc = data_info.get("AccountInfo", {})
                     player_name = str(data_info.get('AccountInfo', {}).get('PlayerNickname', ''))
                     player_uid = int(data_info.get('AccountInfo', {}).get('UID', 0))
+                    level = acc.get("Level") or acc.get("AccountLevel")
                 success_count += 1
             else:
                 failed_count += 1
@@ -140,6 +143,7 @@ async def visit():
             "SuccessfulVisits": success_count,
             "FailedVisits": failed_count,
             "PlayerNickname": player_name,
+            "Level": level,
             "UID": player_uid,
             "Credits": "JCD X GOST"
         }

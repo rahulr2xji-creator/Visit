@@ -99,25 +99,34 @@ def decode_protobuf(binary):
 async def visit():
     target_uid = request.args.get("uid")
     region = request.args.get("region", "").upper()
-    if not target_uid or not region:
-        return jsonify({"error": "Target UID and region are required"}), 400
+
+    if not target_uid:
+        return jsonify({"error": "Target UID required"}), 400
 
     try:
+        # 🔥 STEP 1 — REAL PLAYER INFO (LEVEL + REGION)
+        player_info = fetch_player_info(target_uid)
+        level = player_info["Level"]
+
+        # Agar user galat region de to auto detect ho jayega
+        if player_info["Region"] != "NA":
+            region = player_info["Region"]
+
         tokens = load_tokens(region)
         if tokens is None:
             raise Exception("Failed to load tokens.")
-        
+
         encrypted_target_uid = enc(target_uid)
         if encrypted_target_uid is None:
-            raise Exception("Encryption of target UID failed.")
-        
+            raise Exception("Encryption failed.")
+
         total_visits = len(tokens)
         success_count = 0
         failed_count = 0
         player_name = None
         player_uid = None
-        level = None
 
+        # 🔥 STEP 2 — VISIT REQUESTS
         async with aiohttp.ClientSession() as session:
             tasks = [
                 make_request_async(encrypted_target_uid, region, token['token'], session)
@@ -125,35 +134,34 @@ async def visit():
             ]
             results = await asyncio.gather(*tasks)
 
+        # 🔥 STEP 3 — PLAYER NAME + UID (protobuf se)
         for info in results:
             if info is not None:
-                if player_name is None and player_uid is None:
+                if player_name is None:
                     jsone = MessageToJson(info)
                     data_info = json.loads(jsone)
+
                     acc = data_info.get("AccountInfo", {})
-                    profile = data_info.get("AccountProfileInfo", {})
-                    player_name = str(data_info.get('AccountInfo', {}).get('PlayerNickname', ''))
-                    player_uid = int(data_info.get('AccountInfo', {}).get('UID', 0))
-                    level = profile.get("Level")
+                    player_name = acc.get("PlayerNickname")
+                    player_uid = int(acc.get("UID", 0))
+
                 success_count += 1
             else:
                 failed_count += 1
 
+        # 🔥 FINAL RESPONSE
         summary = {
             "TotalVisits": total_visits,
             "SuccessfulVisits": success_count,
             "FailedVisits": failed_count,
             "PlayerNickname": player_name,
-            "Level": level,
+            "Level": level,   # ✅ REAL LEVEL
             "UID": player_uid,
+            "OB53": "Active",
             "Credits": "JCD X GOST"
         }
+
         return jsonify(summary)
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-if __name__ == '__main__':
-    import asyncio
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    app.run(debug=True, use_reloader=False)

@@ -131,9 +131,10 @@ async def visit():
                     jsone = MessageToJson(info)
                     data_info = json.loads(jsone)
                     acc = data_info.get("AccountInfo", {})
+                    profile = data_info.get("AccountProfileInfo", {})
                     player_name = str(data_info.get('AccountInfo', {}).get('PlayerNickname', ''))
                     player_uid = int(data_info.get('AccountInfo', {}).get('UID', 0))
-                    level = acc.get("Level") or acc.get("AccountLevel")
+                    level = profile.get("Level")
                 success_count += 1
             else:
                 failed_count += 1
